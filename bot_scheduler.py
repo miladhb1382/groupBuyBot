@@ -1,11 +1,16 @@
 import os
-import asyncio
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ChatMemberHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    ChatMemberHandler,
+    ContextTypes,
+)
 
+# دریافت توکن و فاصله ارسال پیام از Environment Variables
 TOKEN = os.environ.get("TOKEN")
 INTERVAL_MINUTES = int(os.environ.get("INTERVAL_MINUTES", 10))
 
+# پیام ثابت
 MESSAGE_TEXT = """
 📣 خریدار گروه قدیمی شما هستیم
 
@@ -31,6 +36,7 @@ MESSAGE_TEXT = """
 id: @MrHBVpn
 """
 
+# لیست گروه‌هایی که بات در آنها اضافه شده
 group_ids = set()
 
 # Handler وقتی بات اضافه شد
@@ -44,25 +50,23 @@ async def on_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"خطا در ارسال اولیه به {chat.id}: {e}")
 
-# Task دوره‌ای پیام‌ها
-async def send_periodic_messages(app):
-    await asyncio.sleep(10)  # صبر اولیه قبل از اولین ارسال
-    while True:
-        for chat_id in list(group_ids):
-            try:
-                await app.bot.send_message(chat_id, MESSAGE_TEXT)
-                print(f"پیام دوره‌ای به {chat_id} ارسال شد")
-            except Exception as e:
-                print(f"خطا در ارسال دوره‌ای به {chat_id}: {e}")
-        await asyncio.sleep(INTERVAL_MINUTES * 60)
+# Job دوره‌ای
+async def periodic_task(context: ContextTypes.DEFAULT_TYPE):
+    for chat_id in list(group_ids):
+        try:
+            await context.bot.send_message(chat_id, MESSAGE_TEXT)
+            print(f"پیام دوره‌ای به {chat_id} ارسال شد")
+        except Exception as e:
+            print(f"خطا در ارسال دوره‌ای به {chat_id}: {e}")
 
-async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(ChatMemberHandler(on_bot_added, ChatMemberHandler.MY_CHAT_MEMBER))
-    # اجرای Task دوره‌ای
-    asyncio.create_task(send_periodic_messages(app))
-    print("بات آماده است و پیام‌ها ارسال می‌شوند.")
-    await app.run_polling()
+# ساخت Application
+app = ApplicationBuilder().token(TOKEN).build()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# ثبت Handler اضافه شدن بات به گروه
+app.add_handler(ChatMemberHandler(on_bot_added, ChatMemberHandler.MY_CHAT_MEMBER))
+
+# اضافه کردن Job دوره‌ای به JobQueue
+app.job_queue.run_repeating(periodic_task, interval=INTERVAL_MINUTES*60, first=10)
+
+print("بات آماده است و پیام‌ها ارسال می‌شوند.")
+app.run_polling()
