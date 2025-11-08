@@ -1,4 +1,6 @@
 import os
+import json
+import asyncio
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -29,14 +31,32 @@ MESSAGE_TEXT = """
 id: @MrHBVpn
 """
 
+# فایل برای ذخیره دائمی گروه‌ها
+GROUPS_FILE = "groups.json"
+
+def load_groups():
+    """بارگذاری لیست گروه‌ها از فایل"""
+    try:
+        with open(GROUPS_FILE, 'r') as f:
+            return set(json.load(f))
+    except FileNotFoundError:
+        return set()
+
+def save_groups(groups):
+    """ذخیره لیست گروه‌ها در فایل"""
+    with open(GROUPS_FILE, 'w') as f:
+        json.dump(list(groups), f)
+
 # لیست گروه‌ها
-group_ids = set()
+group_ids = load_groups()
+print(f"تعداد گروه‌های بارگذاری شده: {len(group_ids)}")
 
 async def on_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """وقتی بات به گروه اضافه شد"""
     chat = update.my_chat_member.chat
     if chat.type in ["group", "supergroup"]:
         group_ids.add(chat.id)
+        save_groups(group_ids)  # ذخیره فوری
         try:
             await context.bot.send_message(chat.id, MESSAGE_TEXT)
             print(f"پیام اولیه به {chat.title} ({chat.id}) ارسال شد")
@@ -49,18 +69,29 @@ async def periodic_task(context: ContextTypes.DEFAULT_TYPE):
         print("هیچ گروهی پیدا نشد.")
         return
 
+    print(f"ارسال پیام دوره‌ای به {len(group_ids)} گروه...")
+    
+    failed_groups = []
     for chat_id in list(group_ids):
         try:
             await context.bot.send_message(chat_id, MESSAGE_TEXT)
-            print(f"پیام دوره‌ای به {chat_id} ارسال شد")
+            print(f"✅ پیام دوره‌ای به {chat_id} ارسال شد")
         except Exception as e:
-            print(f"خطا در ارسال به {chat_id}: {e}")
+            print(f"❌ خطا در ارسال به {chat_id}: {e}")
+            failed_groups.append(chat_id)
             # اگر بات از گروه حذف شده بود، آن را حذف کن
-            if "chat not found" in str(e).lower():
-                group_ids.discard(chat_id)
+            if any(error in str(e).lower() for error in ["chat not found", "bot was blocked", "kicked", "forbidden"]):
+                failed_groups.append(chat_id)
 
-def main():
-    """اجرای اصلی بات - sync"""
+    # حذف گروه‌های مشکل‌دار
+    if failed_groups:
+        for chat_id in failed_groups:
+            group_ids.discard(chat_id)
+        save_groups(group_ids)  # ذخیره تغییرات
+        print(f"حذف {len(failed_groups)} گروه مشکل‌دار")
+
+async def main():
+    """اجرای اصلی بات - async"""
     app = ApplicationBuilder().token(TOKEN).build()
 
     # هندلر اضافه شدن بات
@@ -74,10 +105,10 @@ def main():
     )
 
     print(f"بات فعال شد و هر {INTERVAL_MINUTES} دقیقه پیام ارسال می‌کند.")
+    print(f"تعداد گروه‌های فعال: {len(group_ids)}")
     
-    # run_polling باید بدون await و بدون asyncio.run در main باشه
-    app.run_polling(drop_pending_updates=True)
+    # شروع polling
+    await app.run_polling(drop_pending_updates=True)
 
-# فقط در صورت اجرای مستقیم
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
