@@ -113,9 +113,10 @@ async def periodic_task(context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📊 نتیجه ارسال: {successful_count} موفق, {len(failed_groups)} حذف شده")
 
-async def main():
-    """اجرای اصلی بات - async"""
+def main():
+    """اجرای اصلی بات - sync برای نسخه 20.3"""
     try:
+        # برای نسخه 20.3 از ApplicationBuilder().build() استفاده می‌کنیم
         app = ApplicationBuilder().token(TOKEN).build()
 
         # هندلر اضافه شدن بات
@@ -133,11 +134,11 @@ async def main():
         print(f"👥 تعداد گروه‌های فعال: {len(group_ids)}")
         print(f"💾 فایل ذخیره‌سازی: {GROUPS_FILE}")
         
-        # شروع polling
-        await app.run_polling(drop_pending_updates=True)
+        # شروع polling - برای نسخه 20.3 از run_polling() ساده استفاده می‌کنیم
+        app.run_polling(drop_pending_updates=True)
         
     except Exception as e:
-        print(f"🚫 خطای критиاد در اجرای بات: {e}")
+        print(f"🚫 خطای کریتیکال در اجرای بات: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
