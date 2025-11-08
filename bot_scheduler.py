@@ -124,12 +124,12 @@ async def main():
         # تنظیم job برای ارسال دوره‌ای
         app.job_queue.run_repeating(
             callback=periodic_task,
-            interval=5 * 60,
+            interval=INTERVAL_MINUTES * 60,
             first=10  # اولین ارسال بعد از 10 ثانیه
         )
 
         print(f"🤖 بات فعال شد!")
-        print(f"⏰ ارسال پیام هر {5} دقیقه")
+        print(f"⏰ ارسال پیام هر {INTERVAL_MINUTES} دقیقه")
         print(f"👥 تعداد گروه‌های فعال: {len(group_ids)}")
         print(f"💾 فایل ذخیره‌سازی: {GROUPS_FILE}")
         
